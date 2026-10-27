@@ -1,0 +1,1609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Balloon Analogue Risk Task (BART) classroom game, after Pei et al. (2020).">
+<title>BART Balloon Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&display=swap">
+<style>
+/* Layout: a lab stimulus monitor. Left: the stage (balloon, Wager/Total readout, two response keys). Right: one panel that swaps Setup / live HUD / Results. Stacks on phones. */
+:root {
+  --bg: #E7ECF0;
+  --surface: #FFFFFF;
+  --surface-2: #F2F5F8;
+  --ink: #15202B;
+  --muted: #566372;
+  --line: #D1D9E0;
+  --stage-hi: #FCFDFE;
+  --stage-lo: #DCE4EB;
+  --balloon: #D8232C;
+  --balloon-hi: #FF7468;
+  --balloon-deep: #8C0F17;
+  --bank: #0B7464;
+  --bank-deep: #064A40;
+  --burst: #FFC73A;
+  --ok: #10804A;
+  --bad: #C2262E;
+  --f-display: Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-body: Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-data: Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --radius: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F141A; --surface: #18202A; --surface-2: #1F2833; --ink: #E6EBF0; --muted: #9AA7B4; --line: #2C3743;
+    --stage-hi: #1D2732; --stage-lo: #111820;
+    --balloon: #E2333B; --balloon-hi: #FF8075; --balloon-deep: #98141C;
+    --bank: #14917E; --bank-deep: #0A5A4E; --burst: #FFCB45; --ok: #3CC27A; --bad: #FF6B6B;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F141A; --surface: #18202A; --surface-2: #1F2833; --ink: #E6EBF0; --muted: #9AA7B4; --line: #2C3743;
+  --stage-hi: #1D2732; --stage-lo: #111820;
+  --balloon: #E2333B; --balloon-hi: #FF8075; --balloon-deep: #98141C;
+  --bank: #14917E; --bank-deep: #0A5A4E; --burst: #FFCB45; --ok: #3CC27A; --bad: #FF6B6B;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 17px; line-height: 1.5; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--bank); outline-offset: 2px; }
+
+.shell {
+  min-height: 100%;
+  display: grid; grid-template-rows: auto 1fr; gap: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 20px;
+  max-width: 1440px; margin: 0 auto;
+}
+
+/* Top bar */
+.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+.brand svg { flex: none; }
+.brand b { font: 700 22px/1 var(--f-display); letter-spacing: -0.01em; }
+.brand span { color: var(--muted); font-size: 14px; }
+.tbtn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 7px 14px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+}
+.tbtn:hover { border-color: var(--muted); }
+.tbtn svg { width: 16px; height: 16px; }
+
+/* Main grid */
+.app { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) { .app { grid-template-columns: minmax(0, 1fr); } }
+
+/* Stage card */
+.stage-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  overflow: hidden; display: flex; flex-direction: column; min-width: 0;
+}
+.stage {
+  position: relative; height: clamp(300px, 60vh, 640px);
+  background: radial-gradient(120% 90% at 50% 18%, var(--stage-hi), var(--stage-lo));
+  overflow: hidden;
+}
+.stage-inner { position: absolute; inset: 0; }
+.stage svg.scene, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage canvas { pointer-events: none; }
+.stage.shake .stage-inner { animation: shake .42s cubic-bezier(.36,.07,.19,.97); }
+@keyframes shake {
+  10%, 90% { transform: translate(-2px, 1px); }
+  20%, 80% { transform: translate(5px, -3px); }
+  30%, 50%, 70% { transform: translate(-7px, 3px); }
+  40%, 60% { transform: translate(7px, -2px); }
+}
+.chips { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; z-index: 2; }
+.chip {
+  font: 600 13px/1 var(--f-data); background: var(--surface); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 48%;
+}
+.chip strong { color: var(--ink); }
+.outcome {
+  position: absolute; left: 50%; top: 13%; transform: translateX(-50%);
+  font: 700 clamp(36px, 6vw, 68px)/1 var(--f-display); letter-spacing: -0.02em; z-index: 3; pointer-events: none;
+  text-align: center; white-space: nowrap;
+}
+.outcome small { display: block; font: 600 clamp(15px, 1.6vw, 19px)/1.3 var(--f-data); letter-spacing: 0; margin-top: 8px; color: var(--ink); text-shadow: 0 0 3px var(--stage-hi), 0 0 8px var(--stage-hi), 0 0 14px var(--stage-hi); }
+.outcome.ok { color: var(--ok); }
+.outcome.bad { color: var(--bad); }
+.outcome.show { animation: popin .5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes popin { from { transform: translateX(-50%) scale(.4); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+
+.readout {
+  display: flex; justify-content: center; gap: clamp(20px, 5vw, 56px); flex-wrap: wrap;
+  padding: 14px 16px 10px; font-family: var(--f-data); font-size: clamp(19px, 2.3vw, 28px);
+  font-variant-numeric: tabular-nums; border-top: 1px solid var(--line);
+}
+.readout .lab { color: var(--muted); font-weight: 500; }
+.readout .val { font-weight: 600; display: inline-block; min-width: 3.4ch; }
+.readout .val.pulse { animation: pulse .6s ease-out; }
+@keyframes pulse { 0% { transform: scale(1); } 30% { transform: scale(1.22); color: var(--bank); } 100% { transform: scale(1); } }
+
+.waitbar { height: 4px; margin: 0 16px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.waitbar i { display: block; height: 100%; width: 0; background: var(--muted); }
+
+.controls { display: flex; gap: 14px; padding: 14px 16px 18px; }
+.key-btn {
+  flex: 1; min-height: 76px; border: 0; border-radius: 18px; cursor: pointer; color: #fff;
+  font: 700 clamp(21px, 2.4vw, 30px)/1 var(--f-display); letter-spacing: -0.01em;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  transition: transform .08s ease, box-shadow .08s ease, opacity .2s ease;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.key-btn.inflate { background: var(--balloon); box-shadow: 0 6px 0 var(--balloon-deep); }
+.key-btn.bank { background: var(--bank); box-shadow: 0 6px 0 var(--bank-deep); }
+.key-btn:not(:disabled):active, .key-btn.pressed { transform: translateY(5px); box-shadow: 0 1px 0 var(--balloon-deep); }
+.key-btn.bank:not(:disabled):active, .key-btn.bank.pressed { box-shadow: 0 1px 0 var(--bank-deep); }
+.key-btn:disabled { opacity: .38; cursor: not-allowed; }
+.key-btn kbd {
+  font: 600 12px/1 var(--f-data); padding: 5px 7px; border-radius: 6px;
+  background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.4); letter-spacing: .02em;
+}
+.controls-note { text-align: center; color: var(--muted); font-size: 14px; margin: -6px 16px 14px; min-height: 1.5em; }
+
+/* Panel */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; min-width: 0; }
+.panel h1, .panel h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -0.015em; line-height: 1.08; }
+.panel h1 { font-size: clamp(28px, 3vw, 38px); font-weight: 700; }
+.panel h2 { font-size: 24px; font-weight: 700; }
+.panel h3 { font: 700 13px/1.2 var(--f-data); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+.eyebrow { font: 600 12px/1.3 var(--f-data); text-transform: uppercase; letter-spacing: .09em; color: var(--balloon); margin: 0 0 10px; }
+.lede { color: var(--muted); margin: 12px 0 0; max-width: 60ch; }
+.stack { display: grid; gap: 22px; }
+.rules { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.rules li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; }
+.rules li::before {
+  content: ""; width: 12px; height: 15px; margin-top: 4px; justify-self: center;
+  background: var(--balloon); border-radius: 50% 50% 46% 46% / 56% 56% 44% 44%;
+}
+.rules li.safe::before { background: var(--bank); border-radius: 3px; height: 12px; margin-top: 6px; }
+
+.field { display: grid; gap: 7px; }
+.field > label, .field > legend { font-weight: 700; font-size: 15px; padding: 0; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.text-in {
+  width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); font-size: 17px;
+}
+.text-in:focus { border-color: var(--bank); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--bank) 25%, transparent); }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg label { position: relative; flex: 1 1 auto; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span {
+  display: block; text-align: center; padding: 10px 12px; border-radius: 11px; border: 1px solid var(--line);
+  background: var(--surface-2); font-weight: 700; font-size: 15px; line-height: 1.2; cursor: pointer;
+}
+.seg span em { display: block; font-style: normal; font-weight: 400; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.seg input:checked + span { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+.seg input:checked + span em { color: color-mix(in srgb, var(--surface) 75%, transparent); }
+.seg input:focus-visible + span { outline: 3px solid var(--bank); outline-offset: 2px; }
+
+.btn {
+  border: 1px solid var(--line); background: var(--surface-2); border-radius: 12px; padding: 11px 16px;
+  font-weight: 700; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); font: 700 19px/1 var(--f-display); padding: 16px 20px; width: 100%; }
+.btn.primary:hover { opacity: .9; }
+.btn.danger { color: var(--bad); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-row .btn { flex: 1 1 auto; }
+
+details.about { border-top: 1px solid var(--line); padding-top: 14px; }
+details.about summary { cursor: pointer; font-weight: 700; }
+details.about p, details.about li { color: var(--muted); font-size: 14.5px; }
+details.about a { color: var(--bank); }
+
+.mini-board { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); font-size: 14.5px; }
+.mini-board span { color: var(--muted); min-width: 0; }
+
+/* HUD */
+.dots { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 7px; }
+.dot { aspect-ratio: 1; max-width: 100%; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; }
+.dot.cur { border-color: var(--ink); animation: breathe 1.4s ease-in-out infinite; }
+.dot.bank { background: var(--bank); border-color: var(--bank); }
+.dot.pop { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.dot.pop::after { content: ""; width: 46%; height: 2px; background: var(--bad); transform: rotate(45deg); box-shadow: 0 0 0 0 var(--bad); }
+@keyframes breathe { 50% { transform: scale(.82); } }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.stat .k { font-size: 13px; color: var(--muted); }
+.stat .v { font: 600 24px/1.2 var(--f-data); font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 13px; color: var(--muted); font-weight: 500; }
+.keys { display: grid; gap: 8px; font-size: 15px; }
+.keys div { display: flex; align-items: center; gap: 10px; }
+.keys kbd { font: 600 12.5px/1 var(--f-data); border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 7px; padding: 6px 9px; background: var(--surface-2); min-width: 64px; text-align: center; }
+
+/* Results */
+.big-score { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.big-score b { font: 700 clamp(48px, 6vw, 68px)/1 var(--f-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.big-score span { color: var(--muted); }
+.tag { display: inline-block; font: 700 12.5px/1 var(--f-data); padding: 6px 9px; border-radius: 999px; letter-spacing: .04em; text-transform: uppercase; border: 1px solid currentColor; }
+.tag.bold { color: var(--balloon); }
+.tag.typ { color: var(--muted); }
+.tag.cau { color: var(--bank); }
+.chart { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--f-data); fill: var(--muted); }
+.chart .axis { stroke: var(--line); stroke-width: 1; }
+.chart .curve { fill: color-mix(in srgb, var(--muted) 16%, transparent); stroke: var(--muted); stroke-width: 1.5; }
+.chart .paper { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chart .you { stroke: var(--balloon); stroke-width: 2.5; }
+.chart .youdot { fill: var(--balloon); }
+.chart .classm { stroke: var(--bank); stroke-width: 2; stroke-dasharray: 2 3; }
+.chart .bar { fill: var(--line); }
+.chart .bar.best { fill: var(--bank); }
+.chart .val { fill: var(--ink); font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2.5px solid; vertical-align: middle; margin-right: 6px; }
+.note { font-size: 14.5px; color: var(--muted); margin: 8px 0 0; }
+.note strong { color: var(--ink); }
+
+/* Overlays */
+.overlay { position: fixed; inset: 0; background: color-mix(in srgb, #0B1016 55%, transparent); display: grid; place-items: center; z-index: 50;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet { background: var(--surface); color: var(--ink); border-radius: var(--radius); border: 1px solid var(--line); width: min(920px, 100%); max-height: 100%; overflow: auto; padding: 22px; display: grid; gap: 16px; }
+.sheet h2 { font: 700 26px/1.1 var(--f-display); margin: 0; letter-spacing: -0.015em; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font: 600 12px/1.2 var(--f-data); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--surface-2); }
+td.n { font-family: var(--f-data); font-variant-numeric: tabular-nums; text-align: right; }
+th.n { text-align: right; }
+tr.me td { background: color-mix(in srgb, var(--balloon) 9%, transparent); }
+tbody tr:last-child td { border-bottom: 0; }
+.empty { padding: 26px; text-align: center; color: var(--muted); }
+.sheet.wide { width: min(1080px, 100%); }
+.sheet h3 { font: 700 13px/1.2 var(--f-data); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+.cls-body { display: grid; gap: 22px; min-width: 0; }
+.sheet > *, .cls-body > * { min-width: 0; }
+.sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.stat .s { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.chart-scroll { position: relative; overflow-x: auto; }
+.cls-chart { min-width: 620px; }
+.cls-chart :not(.rowbg) { pointer-events: none; }
+.cls-chart .rowbg { fill: transparent; pointer-events: all; }
+.cls-chart .rowbg.me { fill: color-mix(in srgb, var(--balloon) 9%, transparent); }
+.cls-chart .rowbg.on { fill: var(--surface-2); }
+.cls-chart .sep { stroke: var(--line); stroke-width: 1; }
+.cls-chart .band { fill: color-mix(in srgb, var(--muted) 12%, transparent); }
+.cls-chart .stem { stroke: var(--muted); stroke-width: 1.5; opacity: .55; }
+.cls-chart .dot { fill: var(--balloon); stroke: var(--surface); stroke-width: 2; }
+.cls-chart .pbar { fill: var(--bank); }
+.cls-chart .hd { font-size: 11.5px; font-weight: 700; }
+.cls-chart .rk { font-size: 12px; }
+.cls-chart .nm { fill: var(--ink); font-size: 13.5px; }
+.cls-chart .nm.top { font-weight: 700; }
+.cls-chart .v2 { fill: var(--ink); font-size: 12px; }
+.cls-chart .av { font-size: 11px; }
+.cls-chart .pc { fill: var(--ink); font-size: 13.5px; font-weight: 700; }
+.cls-chart .ml { font-size: 11px; font-weight: 700; }
+.cls-chart .ml.s { fill: var(--ink); }
+.cls-chart .ml.c { fill: var(--bank); }
+.legend i.sw { width: 14px; height: 10px; border: 0; border-radius: 2px; background: color-mix(in srgb, var(--muted) 22%, transparent); }
+.legend i.dt { width: 10px; height: 10px; border: 0; border-radius: 50%; background: var(--balloon); }
+.tip { position: absolute; z-index: 2; background: var(--ink); color: var(--surface); border-radius: 10px; padding: 9px 12px; font-size: 13.5px; line-height: 1.45; pointer-events: none; max-width: 270px; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.tip b { font-size: 15px; }
+.btn.accent { width: 100%; border-color: var(--bank); color: var(--bank); font: 700 18px/1 var(--f-display); padding: 15px 20px; }
+.btn.accent svg { width: 18px; height: 18px; }
+.copy-area { width: 100%; min-height: 160px; font: 13px/1.45 var(--f-data); padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); resize: vertical; }
+.toast { position: fixed; left: 50%; bottom: max(22px, calc(env(safe-area-inset-bottom, 0px) + 12px)); transform: translateX(-50%); background: var(--ink); color: var(--surface);
+  padding: 11px 18px; border-radius: 999px; font-weight: 700; z-index: 60; font-size: 15px; }
+
+.fly { position: fixed; z-index: 40; font: 700 22px/1 var(--f-data); color: var(--bank); pointer-events: none; text-shadow: 0 1px 0 var(--surface); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .brand span { display: none; }
+  .controls { gap: 10px; padding: 12px 12px 16px; }
+  .key-btn { min-height: 68px; }
+  .key-btn kbd { display: none; }
+  .panel { padding: 18px; }
+  .stage { height: clamp(280px, 48vh, 460px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage.shake .stage-inner { animation: none; }
+  .dot.cur { animation: none; }
+  .outcome.show { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <header class="bar">
+    <div class="brand">
+      <svg width="26" height="34" viewBox="0 0 26 34" aria-hidden="true"><path d="M13 26C6 23 1 17 1 11.5 1 5 6.4 1 13 1s12 4 12 10.5C25 17 20 23 13 26Z" fill="var(--balloon)"/><path d="M10.5 29h5l-1.6-3h-1.8z" fill="var(--balloon-deep)"/><ellipse cx="8.4" cy="8" rx="2.4" ry="3.6" fill="#fff" opacity=".55" transform="rotate(-25 8.4 8)"/></svg>
+      <b>BART</b>
+      <span>Balloon Analogue Risk Task</span>
+    </div>
+    <button class="tbtn" id="boardBtn" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 14V7M8 14V2M14 14V9.5"/></svg>Class results</button>
+    <button class="tbtn" id="soundBtn" type="button" aria-pressed="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor" stroke="none"/><path id="soundWaves" d="M11.5 5.5c1 1.4 1 3.6 0 5M13.5 3.5c2 2.6 2 6.4 0 9"/></svg><span id="soundLabel">Sound on</span></button>
+    <button class="tbtn" id="fsBtn" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>Full screen</button>
+  </header>
+
+  <main class="app">
+    <section class="stage-card" aria-label="Balloon task">
+      <div class="stage" id="stage">
+        <div class="stage-inner">
+          <svg class="scene" id="scene" viewBox="0 0 400 440" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+            <defs>
+              <radialGradient id="gBody" cx="36%" cy="30%" r="78%">
+                <stop offset="0%" style="stop-color: var(--balloon-hi)"/>
+                <stop offset="38%" style="stop-color: var(--balloon)"/>
+                <stop offset="100%" style="stop-color: var(--balloon-deep)"/>
+              </radialGradient>
+              <linearGradient id="gRim" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+                <stop offset="1" stop-color="#fff" stop-opacity=".22"/>
+              </linearGradient>
+            </defs>
+            <g id="float" transform="translate(200 345)">
+              <path id="string" d="M0 13 C 6 45, -6 80, 0 108" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round"/>
+              <g id="body">
+                <path id="bodyPath" d="M0 0 C -18 -6 -120 -70 -120 -170 C -120 -245 -66 -292 0 -292 C 66 -292 120 -245 120 -170 C 120 -70 18 -6 0 0 Z" fill="url(#gBody)"/>
+                <path d="M0 0 C -18 -6 -120 -70 -120 -170 C -120 -245 -66 -292 0 -292 C 66 -292 120 -245 120 -170 C 120 -70 18 -6 0 0 Z" fill="url(#gRim)"/>
+                <ellipse cx="-52" cy="-212" rx="20" ry="40" fill="#fff" opacity=".5" transform="rotate(-28 -52 -212)"/>
+                <ellipse cx="-24" cy="-254" rx="7" ry="9" fill="#fff" opacity=".55"/>
+              </g>
+              <path id="scrap" d="M-11 3 L-7 -9 L-3 -3 L0 -12 L4 -4 L8 -10 L11 2 Q0 7 -11 3 Z" fill="var(--balloon)" visibility="hidden"/>
+              <path id="knot" d="M-4 -1 Q0 3 4 -1 L10 12 Q0 16 -10 12 Z" fill="var(--balloon-deep)"/>
+            </g>
+          </svg>
+          <canvas id="fx"></canvas>
+        </div>
+        <div class="chips">
+          <span class="chip" id="chipBalloon">Balloon <strong>–</strong></span>
+          <span class="chip" id="chipPlayer">Ready</span>
+        </div>
+        <div class="outcome" id="outcome" hidden></div>
+      </div>
+      <div class="readout" aria-live="off">
+        <div><span class="lab">Wager:</span> <span class="val" id="wagerVal">0.00</span></div>
+        <div><span class="lab">Total:</span> <span class="val" id="totalVal">0.00</span></div>
+      </div>
+      <div class="waitbar" aria-hidden="true"><i id="waitFill"></i></div>
+      <div class="controls">
+        <button class="key-btn inflate" id="inflateBtn" type="button" disabled>Inflate <kbd>Space</kbd></button>
+        <button class="key-btn bank" id="bankBtn" type="button" disabled>Bank <kbd>Enter</kbd></button>
+      </div>
+      <p class="controls-note" id="controlsNote">Set up a player on the right, then press Start game.</p>
+    </section>
+
+    <aside class="panel" id="panel">
+      <!-- SETUP -->
+      <div id="viewSetup" class="stack">
+        <div>
+          <p class="eyebrow">Classroom replication of Pei et al. (2020)</p>
+          <h1>Balloon Analogue Risk Task</h1>
+          <p class="lede">The risk game 83 teenagers played inside an fMRI scanner. Pump the balloon to raise its value, and bank before it bursts.</p>
+        </div>
+        <div>
+          <h3>How it works</h3>
+          <ul class="rules">
+            <li><span>Each <strong>Inflate</strong> makes the balloon bigger and adds points to its wager.</span></li>
+            <li><span>The balloon could explode at any size. Bigger balloons are worth more and are more likely to explode.</span></li>
+            <li><span>If it explodes, you lose that balloon's wager.</span></li>
+            <li class="safe"><span><strong>Bank</strong> adds the wager to your total. Banked points are safe, then a new balloon appears.</span></li>
+          </ul>
+        </div>
+        <form id="setupForm" class="stack" novalidate>
+          <div class="field">
+            <label for="playerName">Player name</label>
+            <input class="text-in" id="playerName" type="text" maxlength="24" autocomplete="off" placeholder="e.g. Mia" spellcheck="false">
+          </div>
+          <fieldset class="field">
+            <legend>Number of balloons</legend>
+            <div class="seg">
+              <label><input type="radio" name="count" id="count30" value="30" checked><span>30<em>full task</em></span></label>
+              <label><input type="radio" name="count" id="count20" value="20"><span>20<em>shorter</em></span></label>
+              <label><input type="radio" name="count" id="count10" value="10"><span>10<em>quick turn</em></span></label>
+            </div>
+          </fieldset>
+          <fieldset class="field">
+            <legend>Timing</legend>
+            <div class="seg">
+              <label><input type="radio" name="timing" id="timingLab" value="lab" checked><span>Lab timing<em>1.5–2.5 s pauses, as in the scanner</em></span></label>
+              <label><input type="radio" name="timing" id="timingQuick" value="quick"><span>Quick play<em>short pauses</em></span></label>
+            </div>
+          </fieldset>
+          <button class="btn primary" type="submit" id="startBtn">Start game</button>
+        </form>
+        <div class="mini-board" id="miniBoard">
+          <span id="miniBoardText">No results on this computer yet.</span>
+          <button class="btn" type="button" id="miniBoardBtn">Open</button>
+        </div>
+        <details class="about">
+          <summary>About this task</summary>
+          <p>In <a href="https://doi.org/10.1016/j.dcn.2020.100794" target="_blank" rel="noopener">Pei et al. (2020)</a>, 16–17-year-old males played this BART during fMRI. One week later they drove a simulator alone and with a risky or a cautious peer passenger. Brain responses to bigger stakes in this game predicted who followed the risky peer.</p>
+          <ul>
+            <li>Up to 12 pumps per balloon. The balloon's value rises from 0 to 5.15 points, and the first pumps are worth 0.05, 0.15 and 0.25, as in the paper's Figure 1.</li>
+            <li>Changed from the paper: every balloon has a hidden burst point somewhere between pump 3 and pump 12, and about 1 in 10 balloons never bursts. Burst points are spread out and shuffled, so they do not cluster around one size.</li>
+            <li>Lab timing uses a random 1.5–2.5 s pause between decisions on a balloon and 2–4 s between balloons.</li>
+            <li>The risk score is the <em>adjusted pumps</em>: average pumps on balloons you banked. The study's mean was 4.70 (SD 0.86).</li>
+          </ul>
+        </details>
+      </div>
+
+      <!-- HUD -->
+      <div id="viewHud" class="stack" hidden>
+        <div>
+          <p class="eyebrow" id="hudEyebrow">Now playing</p>
+          <h2 id="hudName">Player</h2>
+        </div>
+        <div>
+          <h3 id="hudProgressLabel">Balloons</h3>
+          <div class="dots" id="dots"></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Banked</div><div class="v" id="hudBanked">0</div></div>
+          <div class="stat"><div class="k">Exploded</div><div class="v" id="hudPopped">0</div></div>
+        </div>
+        <div>
+          <h3>Keys</h3>
+          <div class="keys">
+            <div><kbd>Space</kbd> Inflate the balloon</div>
+            <div><kbd>Enter</kbd> Bank the wager</div>
+          </div>
+        </div>
+        <p class="note">Remember: the balloon could explode at any size.</p>
+        <div class="btn-row" id="quitRow">
+          <button class="btn danger" type="button" id="quitBtn">End game early</button>
+        </div>
+        <div class="btn-row" id="quitConfirm" hidden>
+          <button class="btn danger" type="button" id="quitYes">End and show results</button>
+          <button class="btn" type="button" id="quitNo">Keep playing</button>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
+      <div id="viewResults" class="stack" hidden>
+        <div>
+          <p class="eyebrow">Results</p>
+          <h2 id="resName">Player</h2>
+        </div>
+        <div>
+          <div class="big-score"><b id="resTotal">0.00</b><span>points</span></div>
+          <div style="margin-top:8px"><span class="tag typ" id="resTag">Typical</span></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Adjusted pumps</div><div class="v" id="resAdj">–</div></div>
+          <div class="stat"><div class="k">Banked / exploded</div><div class="v" id="resBP">0 / 0</div></div>
+          <div class="stat"><div class="k">Inflate decision</div><div class="v" id="resRtI">–</div></div>
+          <div class="stat"><div class="k">Bank decision</div><div class="v" id="resRtB">–</div></div>
+        </div>
+        <div>
+          <h3>You vs. the 83 teens in the study</h3>
+          <svg class="chart" id="cmpChart" viewBox="0 0 360 150" role="img" aria-label="Distribution of adjusted pumps in the study with your score marked"></svg>
+          <div class="legend" id="cmpLegend"></div>
+          <p class="note" id="cmpNote"></p>
+        </div>
+        <div>
+          <h3>What was hidden: average payoff per balloon</h3>
+          <svg class="chart" id="evChart" viewBox="0 0 360 178" role="img" aria-label="Expected points per balloon if you bank after each number of pumps"></svg>
+          <p class="note" id="evNote"></p>
+        </div>
+        <div class="btn-row">
+          <button class="btn" type="button" id="copyResultBtn">Copy my result</button>
+          <button class="btn" type="button" id="copyTrialsBtn">Copy balloon data</button>
+        </div>
+        <button class="btn accent" type="button" id="classResultsBtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 14V7M8 14V2M14 14V9.5"/></svg>See class results</button>
+        <button class="btn primary" type="button" id="againBtn">Next player</button>
+        <p class="note">Saved to the class results on this computer.</p>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="overlay" id="boardOverlay" hidden>
+  <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="boardTitle">
+    <div class="sheet-head">
+      <h2 id="boardTitle">Class results</h2>
+      <button class="btn" type="button" id="boardClose">Close</button>
+    </div>
+    <p class="note" id="boardSummary" style="margin:0"></p>
+    <div class="cls-body">
+      <div class="sum-grid" id="clsStats"></div>
+      <div id="clsChartBlock">
+        <h3>Where each player falls among the 83 teens in the study</h3>
+        <div class="chart-scroll" id="clsChartWrap">
+          <svg class="chart cls-chart" id="clsChart" viewBox="0 0 720 200" role="img" aria-label="Each player's points and adjusted pumps, compared with the distribution in the study"></svg>
+          <div class="tip" id="clsTip" hidden></div>
+        </div>
+        <div class="legend" id="clsLegend"></div>
+        <p class="note" id="clsNote"></p>
+      </div>
+      <div>
+        <h3>All results</h3>
+        <div class="table-wrap" id="boardTable"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" type="button" id="boardCopy">Copy table for Excel / Sheets</button>
+      <button class="btn danger" type="button" id="boardClear">Clear all results</button>
+    </div>
+    <div class="btn-row" id="boardClearConfirm" hidden>
+      <button class="btn danger" type="button" id="boardClearYes">Delete all results on this computer</button>
+      <button class="btn" type="button" id="boardClearNo">Cancel</button>
+    </div>
+    <p class="note" style="margin:0">Results are kept in this browser on this computer only. Clear all results before a new class so the summary covers only that session.</p>
+  </div>
+</div>
+
+<div class="overlay" id="copyOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="copyTitle" style="width:min(640px,100%)">
+    <div class="sheet-head">
+      <h2 id="copyTitle">Copy this text</h2>
+      <button class="btn" type="button" id="copyClose">Close</button>
+    </div>
+    <p class="note" style="margin:0">Your browser blocked automatic copying. The text is selected: press Ctrl+C (⌘C on Mac).</p>
+    <textarea class="copy-area" id="copyArea" readonly></textarea>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Task parameters ---------- */
+  // Wager after n successful pumps (n = 0..12): rises from 0 to 5.15 points.
+  var W = [0, 0.05, 0.15, 0.25, 0.55, 0.95, 1.45, 2.05, 2.75, 3.45, 4.25, 4.70, 5.15];
+  var MAX = 12;
+  // Behavioural results reported in Pei et al. (2020), section 3.1.1
+  var PAPER = { adj: { m: 4.70, sd: 0.86 }, rtI: 493, rtB: 472, popRate: 7.67 / 27.83 };
+
+  // Hidden burst point. BURST[k] = share of balloons that burst on pump k.
+  // Never on pumps 1-2, spread widely over pumps 3-12; the remaining 10% never burst and can reach full size.
+  var BURST = [0, 0, 0, 0.04, 0.07, 0.09, 0.10, 0.11, 0.11, 0.11, 0.10, 0.09, 0.08];
+  var NEVER = MAX + 1;
+  // SURV[n]: chance a balloon is still intact after n pumps. RISK[n]: chance pump n bursts it, given it was intact.
+  var SURV = [1], RISK = [0];
+  for (var n0 = 1; n0 <= MAX; n0++) { SURV.push(Math.max(0, SURV[n0 - 1] - BURST[n0])); RISK.push(BURST[n0] / SURV[n0 - 1]); }
+  // Expected value of banking after n pumps
+  var EV = SURV.map(function (sv, n) { return W[n] * sv; });
+  var BEST = 1;
+  for (var b0 = 1; b0 <= MAX; b0++) if (EV[b0] > EV[BEST]) BEST = b0;
+  // One burst point per balloon for the whole game: stratified so they cover the full range, then shuffled.
+  function burstBag(count) {
+    var bag = [];
+    for (var i = 0; i < count; i++) {
+      var u = (i + Math.random()) / count, c = 0, pick = NEVER;
+      for (var k = 1; k <= MAX; k++) { c += BURST[k]; if (u < c) { pick = k; break; } }
+      bag.push(pick);
+    }
+    for (var j = bag.length - 1; j > 0; j--) { var r = Math.floor(Math.random() * (j + 1)); var t = bag[j]; bag[j] = bag[r]; bag[r] = t; }
+    return bag;
+  }
+
+  /* ---------- Helpers ---------- */
+  function $(id) { return document.getElementById(id); }
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  function f2(x) { return (Math.round(x * 100) / 100).toFixed(2); }
+  function jitter(a, b) { return a + Math.random() * (b - a); }
+  function mean(a) { if (!a.length) return null; var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function erf(x) {
+    var s = x < 0 ? -1 : 1; x = Math.abs(x);
+    var t = 1 / (1 + 0.3275911 * x);
+    var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+  }
+  function phi(z) { return 0.5 * (1 + erf(z / Math.SQRT2)); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  /* ---------- Storage (this browser only) ---------- */
+  var BOARD_KEY = 'bart-class-board-v1';
+  var memBoard = [];
+  function loadBoard() {
+    try { var r = localStorage.getItem(BOARD_KEY); if (r) { var a = JSON.parse(r); if (Array.isArray(a)) { memBoard = a; return a; } } } catch (e) {}
+    return memBoard;
+  }
+  function saveBoard(a) { memBoard = a; try { localStorage.setItem(BOARD_KEY, JSON.stringify(a)); } catch (e) {} }
+  function pref(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {}
+    return null;
+  }
+
+  /* ---------- Audio (synthesised, no files needed) ---------- */
+  var ac = null, master = null, noiseBuf = null, soundOn = pref('bart-sound') !== 'off';
+  function audioInit() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      ac = new AC();
+      var comp = ac.createDynamicsCompressor();
+      comp.threshold.value = -12; comp.knee.value = 10; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.2;
+      master = ac.createGain(); master.gain.value = 0.9;
+      master.connect(comp); comp.connect(ac.destination);
+      var len = ac.sampleRate * 2;
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    } catch (e) { ac = null; }
+  }
+  function canPlay() { return soundOn && ac && master; }
+  function noise(t, dur) {
+    var src = ac.createBufferSource(); src.buffer = noiseBuf;
+    src.start(t, Math.random() * 1.2); src.stop(t + dur + 0.05);
+    return src;
+  }
+  function env(g, t, peak, a, hold, rel) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + rel);
+  }
+  // Pump: a rush of air whose pitch climbs with the balloon's size, plus a rubbery stretch.
+  function sInflate(n) {
+    if (!canPlay()) return;
+    var t = ac.currentTime + 0.01, dur = 0.42;
+    var src = noise(t, dur);
+    var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(420 + n * 45, t);
+    bp.frequency.exponentialRampToValueAtTime(1500 + n * 140, t + dur);
+    var g = ac.createGain(); env(g, t, 0.55, 0.04, dur * 0.55, dur * 0.4);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    var o = ac.createOscillator(); o.type = 'sawtooth';
+    var base = 150 + n * 26;
+    o.frequency.setValueAtTime(base, t);
+    o.frequency.exponentialRampToValueAtTime(base * 1.45, t + dur);
+    var vib = ac.createOscillator(); vib.frequency.value = 23;
+    var vibG = ac.createGain(); vibG.gain.value = base * 0.05;
+    vib.connect(vibG); vibG.connect(o.frequency);
+    var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900 + n * 60; lp.Q.value = 4;
+    var og = ac.createGain(); env(og, t + 0.05, 0.05 + n * 0.007, 0.06, dur * 0.4, 0.18);
+    o.connect(lp); lp.connect(og); og.connect(master);
+    o.start(t); vib.start(t); o.stop(t + dur + 0.3); vib.stop(t + dur + 0.3);
+  }
+  // Pop: sharp crack, a low thump and a short rubbery rattle.
+  function sPop() {
+    if (!canPlay()) return;
+    var t = ac.currentTime + 0.005;
+    var a = noise(t, 0.3);
+    var hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
+    var ga = ac.createGain(); ga.gain.setValueAtTime(1.6, t); ga.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    a.connect(hp); hp.connect(ga); ga.connect(master);
+    var b = noise(t, 0.5);
+    var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(2200, t); lp.frequency.exponentialRampToValueAtTime(180, t + 0.4);
+    var gb = ac.createGain(); gb.gain.setValueAtTime(1.1, t); gb.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    b.connect(lp); lp.connect(gb); gb.connect(master);
+    var o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(170, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.28);
+    var go = ac.createGain(); go.gain.setValueAtTime(1.0, t); go.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+    o.connect(go); go.connect(master); o.start(t); o.stop(t + 0.4);
+    for (var i = 0; i < 5; i++) {
+      var tt = t + 0.06 + i * 0.035 + Math.random() * 0.02;
+      var c = noise(tt, 0.04);
+      var bf = ac.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 1200 + Math.random() * 1600; bf.Q.value = 3;
+      var gc = ac.createGain(); gc.gain.setValueAtTime(0.35 * (1 - i / 6), tt); gc.gain.exponentialRampToValueAtTime(0.0001, tt + 0.035);
+      c.connect(bf); bf.connect(gc); gc.connect(master);
+    }
+  }
+  // Bank: a bright two-note coin chime.
+  function sBank() {
+    if (!canPlay()) return;
+    var t = ac.currentTime + 0.01;
+    [[988, 0], [1319, 0.085], [2637, 0.085]].forEach(function (nt, i) {
+      var o = ac.createOscillator(); o.type = i === 2 ? 'sine' : 'triangle';
+      o.frequency.value = nt[0];
+      var g = ac.createGain(); var st = t + nt[1];
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(i === 2 ? 0.08 : 0.32, st + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + (i === 0 ? 0.18 : 0.75));
+      o.connect(g); g.connect(master); o.start(st); o.stop(st + 0.8);
+    });
+    var c = noise(t, 0.05);
+    var hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5000;
+    var gc = ac.createGain(); gc.gain.setValueAtTime(0.25, t); gc.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    c.connect(hp); hp.connect(gc); gc.connect(master);
+  }
+
+  /* ---------- Balloon rendering ---------- */
+  var stage = $('stage'), floatG = $('float'), bodyG = $('body'), stringEl = $('string'),
+      scrap = $('scrap'), knot = $('knot'), bodyPath = $('bodyPath');
+  var B = {
+    cur: 0.0, vel: 0, tgt: 0, tw: null,
+    offY: 0, alpha: 1, rot: 0, show: true,
+    fall: null, away: null
+  };
+  function scaleFor(n) { return 0.30 + 0.70 * n / MAX; }
+  function setTarget(s, ms) { B.tw = { from: B.tgt, to: s, t0: performance.now(), dur: Math.max(1, ms) }; }
+  function easeInOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+  function resetBalloon(startScale) {
+    B.cur = startScale; B.vel = 0; B.tgt = startScale; B.tw = null;
+    B.offY = 0; B.alpha = 1; B.rot = 0; B.fall = null; B.away = null; B.show = true;
+    bodyG.setAttribute('opacity', '1');
+    knot.setAttribute('visibility', 'visible');
+    scrap.setAttribute('visibility', 'hidden');
+  }
+  resetBalloon(scaleFor(2));
+
+  /* ---------- Effects canvas ---------- */
+  var cvs = $('fx'), ctx = cvs.getContext('2d'), CW = 0, CH = 0;
+  var parts = [], bursts = [], puffs = [];
+  function sizeCanvas() {
+    var r = stage.getBoundingClientRect();
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    CW = r.width; CH = r.height;
+    cvs.width = Math.max(1, Math.round(r.width * dpr)); cvs.height = Math.max(1, Math.round(r.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  sizeCanvas();
+  if (window.ResizeObserver) new ResizeObserver(sizeCanvas).observe(stage); else window.addEventListener('resize', sizeCanvas);
+
+  function localRect(el) {
+    var s = stage.getBoundingClientRect(), r = el.getBoundingClientRect();
+    return { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height };
+  }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  function spawnPuffs() {
+    if (reduceMotion) return;
+    var k = localRect(knot);
+    var cx = k.x + k.w / 2, cy = k.y + k.h;
+    for (var i = 0; i < 6; i++) {
+      puffs.push({ x: cx + rnd(-22, 22), y: cy + rnd(26, 56), vx: 0, vy: rnd(-120, -80), life: 0, ttl: rnd(0.3, 0.5), len: rnd(8, 16), tx: cx });
+    }
+  }
+
+  function explode() {
+    var r = localRect(bodyPath);
+    var cx = r.x + r.w / 2, cy = r.y + r.h * 0.48, rx = r.w / 2, ry = r.h / 2;
+    var cols = [cssVar('--balloon'), cssVar('--balloon-deep'), cssVar('--balloon-hi')];
+    var sizeF = 0.55 + rx / 150;
+    var count = reduceMotion ? 10 : 30;
+    for (var i = 0; i < count; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var d = rnd(0.45, 1);
+      var speed = rnd(260, 820) * (0.7 + 0.5 * sizeF);
+      var npts = 5 + Math.floor(Math.random() * 3), pts = [], sz = rnd(6, 17) * sizeF, stretch = rnd(1, 2.3);
+      for (var j = 0; j < npts; j++) {
+        var ang = (j / npts) * Math.PI * 2 + rnd(-0.3, 0.3), rr = sz * rnd(0.45, 1.1);
+        pts.push([Math.cos(ang) * rr * stretch, Math.sin(ang) * rr]);
+      }
+      parts.push({
+        kind: 'shard', x: cx + Math.cos(a) * rx * d, y: cy + Math.sin(a) * ry * d,
+        vx: Math.cos(a) * speed + rnd(-60, 60), vy: Math.sin(a) * speed - rnd(60, 240),
+        rot: Math.random() * 6.28, vr: rnd(-11, 11), flip: Math.random() * 6.28, vf: rnd(5, 15),
+        pts: pts, col: cols[i % 3], back: cols[1], life: 0, ttl: rnd(1.2, 1.9)
+      });
+    }
+    if (!reduceMotion) {
+      for (var k = 0; k < 18; k++) {
+        var a2 = Math.random() * 6.28, sp = rnd(500, 1100);
+        parts.push({ kind: 'dust', x: cx, y: cy, vx: Math.cos(a2) * sp, vy: Math.sin(a2) * sp, life: 0, ttl: rnd(0.25, 0.45), r: rnd(1.5, 3.5) });
+      }
+    }
+    var R = Math.max(rx, ry) * 1.15 + 18, jit = [];
+    for (var s = 0; s < 32; s++) jit.push(rnd(0.82, 1.12));
+    bursts.push({ x: cx, y: cy, R: R, t: 0, jit: jit, rot: rnd(-0.2, 0.2),
+      fill: cssVar('--burst'), edge: cssVar('--balloon-deep'), ink: cssVar('--balloon-deep') });
+    if (!reduceMotion) {
+      stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+    }
+  }
+
+  function drawStar(b, R, spikes, inner) {
+    ctx.beginPath();
+    for (var i = 0; i < spikes * 2; i++) {
+      var ang = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+      var rr = (i % 2 === 0 ? R : R * inner) * b.jit[i % b.jit.length];
+      var x = Math.cos(ang) * rr, y = Math.sin(ang) * rr;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  function drawFx(dt) {
+    ctx.clearRect(0, 0, CW, CH);
+    // air puffs
+    for (var i = puffs.length - 1; i >= 0; i--) {
+      var p = puffs[i]; p.life += dt;
+      if (p.life > p.ttl) { puffs.splice(i, 1); continue; }
+      p.y += p.vy * dt; p.x += (p.tx - p.x) * Math.min(1, dt * 5);
+      ctx.globalAlpha = 0.55 * (1 - p.life / p.ttl);
+      ctx.strokeStyle = cssVarCache.muted; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y + p.len); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // burst
+    for (var j = bursts.length - 1; j >= 0; j--) {
+      var b = bursts[j]; b.t += dt;
+      if (b.t > 0.95) { bursts.splice(j, 1); continue; }
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+      if (b.t < 0.16) {
+        var fa = 1 - b.t / 0.16;
+        var grd = ctx.createRadialGradient(0, 0, 0, 0, 0, b.R * 1.7);
+        grd.addColorStop(0, 'rgba(255,255,255,' + (0.95 * fa) + ')');
+        grd.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(0, 0, b.R * 1.7, 0, 6.29); ctx.fill();
+      }
+      var grow = b.t < 0.12 ? 0.35 + 0.8 * (b.t / 0.12) : 1.15 - 0.1 * Math.min(1, (b.t - 0.12) / 0.3);
+      var alpha = b.t < 0.45 ? 1 : Math.max(0, 1 - (b.t - 0.45) / 0.5);
+      ctx.globalAlpha = alpha;
+      var R = b.R * grow;
+      drawStar(b, R, 14, 0.6);
+      ctx.fillStyle = b.fill; ctx.fill();
+      ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, R * 0.03); ctx.strokeStyle = b.edge; ctx.stroke();
+      drawStar(b, R * 0.6, 14, 0.66);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();
+      ctx.rotate(-0.12);
+      ctx.font = '700 ' + Math.round(R * 0.4) + 'px Calibri, Carlito, "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = Math.max(3, R * 0.04); ctx.strokeStyle = '#fff'; ctx.strokeText('POP!', 0, 0);
+      ctx.fillStyle = b.ink; ctx.fillText('POP!', 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    // shards and dust
+    for (var k = parts.length - 1; k >= 0; k--) {
+      var q = parts[k]; q.life += dt;
+      if (q.life > q.ttl || q.y > CH + 80) { parts.splice(k, 1); continue; }
+      if (q.kind === 'dust') {
+        q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= (1 - 4 * dt); q.vy *= (1 - 4 * dt);
+        ctx.globalAlpha = 1 - q.life / q.ttl; ctx.fillStyle = cssVarCache.burst;
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 6.29); ctx.fill();
+        continue;
+      }
+      q.vy += 1500 * dt;
+      q.vx *= (1 - 1.8 * dt); q.vy *= (1 - 0.7 * dt);
+      q.x += q.vx * dt; q.y += q.vy * dt;
+      q.rot += q.vr * dt; q.flip += q.vf * dt;
+      var fade = q.life > q.ttl - 0.45 ? Math.max(0, (q.ttl - q.life) / 0.45) : 1;
+      ctx.save(); ctx.globalAlpha = fade;
+      ctx.translate(q.x, q.y); ctx.rotate(q.rot);
+      var fx = Math.cos(q.flip); ctx.scale(Math.abs(fx) < 0.12 ? 0.12 * (fx < 0 ? -1 : 1) : fx, 1);
+      ctx.beginPath();
+      for (var m = 0; m < q.pts.length; m++) {
+        var pt = q.pts[m], nx = q.pts[(m + 1) % q.pts.length];
+        var mx = (pt[0] + nx[0]) / 2, my = (pt[1] + nx[1]) / 2;
+        if (m === 0) ctx.moveTo(mx, my); else ctx.quadraticCurveTo(pt[0], pt[1], mx, my);
+      }
+      var p0 = q.pts[0], p1 = q.pts[1 % q.pts.length];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+      ctx.closePath();
+      ctx.fillStyle = fx < 0 ? q.back : q.col; ctx.fill();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+  var cssVarCache = { muted: cssVar('--muted'), burst: cssVar('--burst') };
+  function refreshCssCache() { cssVarCache.muted = cssVar('--muted'); cssVarCache.burst = cssVar('--burst'); }
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refreshCssCache); } catch (e) {}
+  if (window.MutationObserver) new MutationObserver(refreshCssCache).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  /* ---------- Animation loop ---------- */
+  var last = performance.now();
+  function frame(now) {
+    var dt = Math.min(0.033, (now - last) / 1000); last = now;
+    var t = now / 1000;
+    if (B.tw) {
+      var p = Math.min(1, (now - B.tw.t0) / B.tw.dur);
+      B.tgt = B.tw.from + (B.tw.to - B.tw.from) * easeInOut(p);
+      if (p >= 1) B.tw = null;
+    }
+    // damped spring toward the target size gives an elastic, rubbery feel
+    var k = 240, c = 15;
+    var acc = k * (B.tgt - B.cur) - c * B.vel;
+    B.vel += acc * dt; B.cur += B.vel * dt;
+    var squash = Math.max(-0.07, Math.min(0.07, B.vel * 0.09));
+    var sy = Math.max(0.001, B.cur * (1 + squash)), sx = Math.max(0.001, B.cur * (1 - squash * 0.75));
+    bodyG.setAttribute('transform', 'scale(' + sx.toFixed(4) + ' ' + sy.toFixed(4) + ')');
+
+    if (B.fall) {
+      B.fall.v += 1100 * dt; B.offY += B.fall.v * dt; B.alpha = Math.max(0, B.alpha - dt * 1.4); B.rot += dt * 25;
+    }
+    if (B.away) {
+      var pa = Math.min(1, (now - B.away.t0) / B.away.dur);
+      B.offY = -480 * pa * pa; B.alpha = 1 - pa * pa; B.rot = B.away.dir * 9 * pa;
+      if (pa >= 1) B.away = null;
+    }
+    var bob = reduceMotion ? 0 : Math.sin(t * 1.4) * 5, sway = reduceMotion ? 0 : Math.sin(t * 0.85) * 1.6;
+    floatG.setAttribute('transform', 'translate(200 ' + (345 + bob + B.offY).toFixed(2) + ') rotate(' + (sway + B.rot).toFixed(2) + ')');
+    floatG.setAttribute('opacity', B.alpha.toFixed(3));
+    var sw = reduceMotion ? 0 : Math.sin(t * 1.7) * 6;
+    stringEl.setAttribute('d', 'M0 13 C ' + (6 + sw).toFixed(1) + ' 45, ' + (-6 - sw).toFixed(1) + ' 80, ' + (sw * 0.6).toFixed(1) + ' 108');
+    drawFx(dt);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* ---------- UI references ---------- */
+  var inflateBtn = $('inflateBtn'), bankBtn = $('bankBtn'), wagerVal = $('wagerVal'), totalVal = $('totalVal'),
+      outcomeEl = $('outcome'), waitFill = $('waitFill'), controlsNote = $('controlsNote'),
+      chipBalloon = $('chipBalloon'), chipPlayer = $('chipPlayer'), live = $('live');
+
+  /* ---------- Game state ---------- */
+  var phase = 'setup';
+  var G = null;
+  var gameId = 0;
+
+  function newGame(name, n, lab) {
+    return { name: name, n: n, lab: lab, trial: 0, pumps: 0, total: 0, locked: true, readyAt: 0, bag: burstBag(n), burstAt: NEVER,
+      trials: [], rtI: [], rtB: [], banked: 0, popped: 0, trialRts: [], startedAt: new Date().toISOString() };
+  }
+
+  function setNum(el, v) { el.textContent = f2(v); }
+  function countUp(el, from, to, ms) {
+    var t0 = performance.now();
+    function step(now) {
+      var p = Math.min(1, (now - t0) / ms);
+      el.textContent = f2(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function pulse(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+
+  function setLocked(lock) {
+    if (!G) return;
+    G.locked = lock;
+    inflateBtn.disabled = lock || G.pumps >= MAX;
+    bankBtn.disabled = lock;
+    if (!lock) G.readyAt = performance.now();
+  }
+  function runWaitBar(ms) {
+    waitFill.style.transition = 'none'; waitFill.style.width = '0%';
+    void waitFill.offsetWidth;
+    if (ms < 700) return;
+    waitFill.style.transition = 'width ' + ms + 'ms linear'; waitFill.style.width = '100%';
+  }
+  function clearWaitBar() { waitFill.style.transition = 'none'; waitFill.style.width = '0%'; }
+
+  function showOutcome(kind, title, sub) {
+    outcomeEl.className = 'outcome ' + kind;
+    outcomeEl.innerHTML = esc(title) + (sub ? '<small>' + esc(sub) + '</small>' : '');
+    outcomeEl.hidden = false;
+    void outcomeEl.offsetWidth; outcomeEl.classList.add('show');
+  }
+  function hideOutcome() { outcomeEl.hidden = true; }
+
+  function renderDots() {
+    var wrap = $('dots'); var html = '';
+    for (var i = 0; i < G.n; i++) {
+      var cls = 'dot';
+      if (i < G.trials.length) cls += G.trials[i].outcome === 'bank' ? ' bank' : ' pop';
+      else if (i === G.trial - 1) cls += ' cur';
+      html += '<span class="' + cls + '" title="Balloon ' + (i + 1) + '"></span>';
+    }
+    wrap.innerHTML = html;
+    $('hudBanked').textContent = G.banked;
+    $('hudPopped').textContent = G.popped;
+    $('hudProgressLabel').textContent = 'Balloon ' + Math.max(1, G.trial) + ' of ' + G.n;
+  }
+  function updateChips() {
+    if (G && phase === 'play') {
+      chipBalloon.innerHTML = 'Balloon <strong>' + G.trial + '</strong> / ' + G.n;
+      chipPlayer.textContent = G.name;
+    } else if (phase === 'results' && G) {
+      chipBalloon.innerHTML = 'Finished <strong>' + G.trials.length + '</strong> / ' + G.n;
+      chipPlayer.textContent = G.name;
+    } else {
+      chipBalloon.innerHTML = 'Balloon <strong>–</strong>';
+      chipPlayer.textContent = 'Ready';
+    }
+  }
+  function showView(v) {
+    $('viewSetup').hidden = v !== 'setup';
+    $('viewHud').hidden = v !== 'hud';
+    $('viewResults').hidden = v !== 'results';
+  }
+
+  /* ---------- Flow ---------- */
+  function startGame(e) {
+    if (e) e.preventDefault();
+    audioInit();
+    var nameIn = $('playerName').value.trim();
+    var board = loadBoard();
+    var name = nameIn || ('Player ' + (board.length + 1));
+    var n = parseInt((document.querySelector('input[name="count"]:checked') || {}).value || '30', 10);
+    var lab = ((document.querySelector('input[name="timing"]:checked') || {}).value || 'lab') === 'lab';
+    gameId++;
+    G = newGame(name, n, lab);
+    phase = 'play';
+    $('hudName').textContent = name;
+    $('hudEyebrow').textContent = lab ? 'Now playing, lab timing' : 'Now playing, quick play';
+    $('quitRow').hidden = false; $('quitConfirm').hidden = true;
+    showView('hud');
+    setNum(totalVal, 0); setNum(wagerVal, 0);
+    controlsNote.textContent = 'Get ready…';
+    hideOutcome(); clearWaitBar();
+    nextBalloon(true);
+    if (window.matchMedia && window.matchMedia('(max-width: 880px)').matches) {
+      try { stage.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }); } catch (err) {}
+    }
+  }
+
+  function nextBalloon(first) {
+    var id = gameId;
+    if (G.trial >= G.n) { finish(); return; }
+    G.trial++; G.pumps = 0; G.trialRts = []; G.burstAt = G.bag[G.trial - 1];
+    renderDots(); updateChips(); hideOutcome(); clearWaitBar();
+    setNum(wagerVal, 0);
+    resetBalloon(0.001);
+    setTarget(scaleFor(0), 260);
+    inflateBtn.disabled = true; bankBtn.disabled = true;
+    wait(first ? (G.lab ? 1500 : 700) : 420).then(function () {
+      if (id !== gameId || phase !== 'play') return;
+      controlsNote.textContent = 'Inflate or bank?';
+      setLocked(false);
+    });
+  }
+
+  function pressFx(btn) {
+    btn.classList.add('pressed');
+    setTimeout(function () { btn.classList.remove('pressed'); }, 110);
+  }
+
+  function doInflate() {
+    if (!G || phase !== 'play' || G.locked || G.pumps >= MAX) return;
+    var id = gameId;
+    var rt = performance.now() - G.readyAt;
+    G.rtI.push(rt); G.trialRts.push(rt);
+    setLocked(true); pressFx(inflateBtn);
+    var k = G.pumps + 1;
+    var bursts = k === G.burstAt;
+    sInflate(k); spawnPuffs();
+    setTarget(scaleFor(k), 380);
+    if (bursts) {
+      controlsNote.textContent = ' ';
+      wait(250).then(function () {
+        if (id !== gameId) return;
+        var lost = W[G.pumps];
+        explode(); sPop();
+        bodyG.setAttribute('opacity', '0');
+        scrap.setAttribute('visibility', 'visible');
+        setTimeout(function () { if (id === gameId) B.fall = { v: -60 }; }, 260);
+        G.popped++;
+        G.trials.push({ balloon: G.trial, pumps: k, outcome: 'pop', earned: 0, lost: lost, total: G.total, meanRt: mean(G.trialRts) });
+        setNum(wagerVal, 0);
+        showOutcome('bad', 'Fail!', 'Total: ' + f2(G.total));
+        live.textContent = 'Balloon ' + G.trial + ' exploded on pump ' + k + '. Lost ' + f2(lost) + '.';
+        controlsNote.textContent = 'The balloon exploded. Its wager is lost.';
+        renderDots();
+        var iti = G.lab ? jitter(2000, 4000) : 1700;
+        runWaitBar(iti);
+        return wait(iti).then(function () { if (id === gameId && phase === 'play') nextBalloon(false); });
+      });
+    } else {
+      G.pumps = k;
+      setTimeout(function () { if (id === gameId) { countUp(wagerVal, W[k - 1], W[k], 260); } }, 160);
+      var isi = G.lab ? jitter(1500, 2500) : 480;
+      runWaitBar(isi);
+      controlsNote.textContent = G.lab ? 'Wait…' : ' ';
+      wait(isi).then(function () {
+        if (id !== gameId || phase !== 'play') return;
+        clearWaitBar();
+        setLocked(false);
+        controlsNote.textContent = G.pumps >= MAX ? 'This balloon can’t get any bigger. Bank it!' : 'Inflate or bank?';
+      });
+    }
+  }
+
+  function doBank() {
+    if (!G || phase !== 'play' || G.locked) return;
+    var id = gameId;
+    var rt = performance.now() - G.readyAt;
+    G.rtB.push(rt); G.trialRts.push(rt);
+    setLocked(true); pressFx(bankBtn);
+    var w = W[G.pumps], before = G.total;
+    G.total = Math.round((G.total + w) * 100) / 100;
+    G.banked++;
+    G.trials.push({ balloon: G.trial, pumps: G.pumps, outcome: 'bank', earned: w, lost: 0, total: G.total, meanRt: mean(G.trialRts) });
+    sBank();
+    B.away = { t0: performance.now(), dur: reduceMotion ? 500 : 1150, dir: Math.random() < 0.5 ? -1 : 1 };
+    flyCoin(w, function () { if (id !== gameId) return; countUp(totalVal, before, G.total, 520); pulse(totalVal); });
+    setNum(wagerVal, 0);
+    showOutcome('ok', 'Success!', '+' + f2(w) + ' banked');
+    live.textContent = 'Banked ' + f2(w) + ' after ' + G.pumps + ' pumps. Total ' + f2(G.total) + '.';
+    controlsNote.textContent = 'Banked. Your total is safe.';
+    renderDots();
+    var iti = G.lab ? jitter(2000, 4000) : 1400;
+    runWaitBar(iti);
+    wait(iti).then(function () { if (id === gameId && phase === 'play') nextBalloon(false); });
+  }
+
+  function flyCoin(w, done) {
+    var from = localRect(bodyPath), s = stage.getBoundingClientRect(), to = totalVal.getBoundingClientRect();
+    var el = document.createElement('div');
+    el.className = 'fly'; el.textContent = '+' + f2(w);
+    var x0 = s.left + from.x + from.w / 2 - 30, y0 = s.top + from.y + from.h / 2 - 12;
+    el.style.left = x0 + 'px'; el.style.top = y0 + 'px';
+    document.body.appendChild(el);
+    var dx = to.left + to.width / 2 - 30 - x0, dy = to.top - 6 - y0;
+    if (!el.animate || reduceMotion) { setTimeout(function () { el.remove(); done(); }, 200); return; }
+    var an = el.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 0 },
+      { transform: 'translate(0,-26px) scale(1.25)', opacity: 1, offset: 0.25 },
+      { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(.8)', opacity: 0.9 }
+    ], { duration: 820, easing: 'cubic-bezier(.5,0,.3,1)' });
+    an.onfinish = function () { el.remove(); done(); };
+  }
+
+  function quitGame() {
+    if (!G || phase !== 'play') return;
+    finish();
+  }
+
+  function finish() {
+    gameId++;
+    phase = 'results';
+    setLocked(true); inflateBtn.disabled = true; bankBtn.disabled = true;
+    clearWaitBar(); hideOutcome();
+    controlsNote.textContent = 'Game over. See your results.';
+    setNum(wagerVal, 0); setNum(totalVal, G.total);
+    resetBalloon(0.001); setTarget(scaleFor(3), 400);
+    var r = summarize(G);
+    var board = loadBoard().slice();
+    var rec = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: G.name, at: new Date().toISOString(), points: r.points, adj: r.adj,
+      banked: r.banked, popped: r.popped, balloons: r.balloons, planned: G.n,
+      timing: G.lab ? 'Lab' : 'Quick', rtI: r.rtI, rtB: r.rtB
+    };
+    if (r.balloons > 0) { board.push(rec); saveBoard(board); }
+    G.recordId = rec.id;
+    renderResults(r);
+    showView('results');
+    updateChips();
+    updateMiniBoard();
+  }
+
+  function summarize(g) {
+    var bankedPumps = g.trials.filter(function (t) { return t.outcome === 'bank'; }).map(function (t) { return t.pumps; });
+    var adj = mean(bankedPumps);
+    return {
+      points: g.total, adj: adj === null ? null : Math.round(adj * 100) / 100,
+      banked: g.banked, popped: g.popped, balloons: g.trials.length,
+      rtI: g.rtI.length ? Math.round(mean(g.rtI)) : null,
+      rtB: g.rtB.length ? Math.round(mean(g.rtB)) : null
+    };
+  }
+
+  function profile(adj) {
+    if (adj === null) return { cls: 'typ', label: 'No balloons banked' };
+    if (adj < BEST - 2) return { cls: 'cau', label: 'Cautious' };
+    if (adj > BEST + 1) return { cls: 'bold', label: 'Bold risk taker' };
+    return { cls: 'typ', label: 'Balanced' };
+  }
+
+  /* ---------- Results ---------- */
+  function renderResults(r) {
+    $('resName').textContent = G.name;
+    $('resTotal').textContent = f2(r.points);
+    var pr = profile(r.adj);
+    var tag = $('resTag'); tag.className = 'tag ' + pr.cls; tag.textContent = pr.label;
+    $('resAdj').innerHTML = r.adj === null ? '–' : r.adj.toFixed(2) + '<small>&nbsp;&nbsp;study 4.70</small>';
+    $('resBP').textContent = r.banked + ' / ' + r.popped;
+    $('resRtI').innerHTML = r.rtI === null ? '–' : r.rtI + '<small> ms&nbsp;&nbsp;study 493</small>';
+    $('resRtB').innerHTML = r.rtB === null ? '–' : r.rtB + '<small> ms&nbsp;&nbsp;study 472</small>';
+    drawCompare(r);
+    drawEV(r);
+  }
+
+  function classMeanAdj() {
+    var vals = loadBoard().map(function (x) { return x.adj; }).filter(function (v) { return typeof v === 'number'; });
+    return vals.length >= 2 ? { m: mean(vals), n: vals.length } : null;
+  }
+
+  function drawCompare(r) {
+    var svg = $('cmpChart');
+    var x0 = 18, x1 = 342, base = 112, top = 22, dMin = 1, dMax = 12;
+    function X(v) { return x0 + (Math.max(dMin, Math.min(dMax, v)) - dMin) / (dMax - dMin) * (x1 - x0); }
+    var m = PAPER.adj.m, sd = PAPER.adj.sd, peak = 1 / (sd * Math.sqrt(2 * Math.PI));
+    var d = 'M' + X(dMin) + ' ' + base;
+    for (var v = dMin; v <= dMax + 0.001; v += 0.05) {
+      var y = Math.exp(-0.5 * Math.pow((v - m) / sd, 2)) / (sd * Math.sqrt(2 * Math.PI));
+      d += ' L' + X(v).toFixed(1) + ' ' + (base - y / peak * (base - top - 8)).toFixed(1);
+    }
+    d += ' L' + X(dMax) + ' ' + base + ' Z';
+    var h = '<path class="curve" d="' + d + '"/>';
+    h += '<line class="axis" x1="' + x0 + '" y1="' + base + '" x2="' + x1 + '" y2="' + base + '"/>';
+    for (var t = 1; t <= 12; t++) {
+      h += '<line class="axis" x1="' + X(t) + '" y1="' + base + '" x2="' + X(t) + '" y2="' + (base + 4) + '"/>';
+      h += '<text x="' + X(t) + '" y="' + (base + 17) + '" text-anchor="middle" font-size="10">' + t + '</text>';
+    }
+    h += '<text x="' + ((x0 + x1) / 2) + '" y="' + (base + 34) + '" text-anchor="middle" font-size="10">adjusted pumps (average pumps on banked balloons)</text>';
+    h += '<line class="paper" x1="' + X(m) + '" y1="' + (top - 6) + '" x2="' + X(m) + '" y2="' + base + '"/>';
+    var cm = classMeanAdj();
+    if (cm) h += '<line class="classm" x1="' + X(cm.m) + '" y1="' + (top - 6) + '" x2="' + X(cm.m) + '" y2="' + base + '"/>';
+    if (r.adj !== null) {
+      var yx = X(r.adj);
+      h += '<line class="you" x1="' + yx + '" y1="' + (top - 4) + '" x2="' + yx + '" y2="' + base + '"/>';
+      h += '<circle class="youdot" cx="' + yx + '" cy="' + (top - 4) + '" r="5"/>';
+      var anchor = yx > 300 ? 'end' : (yx < 60 ? 'start' : 'middle');
+      h += '<text class="val" x="' + yx + '" y="' + (top - 13) + '" text-anchor="' + anchor + '" font-size="11">You ' + r.adj.toFixed(2) + (r.adj > dMax || r.adj < dMin ? ' →' : '') + '</text>';
+    }
+    svg.setAttribute('viewBox', '0 0 360 156');
+    svg.innerHTML = h;
+    var lg = '<span><i style="border-color:var(--ink);border-top-style:dashed"></i>Study mean 4.70</span>';
+    if (r.adj !== null) lg += '<span><i style="border-color:var(--balloon)"></i>You</span>';
+    if (cm) lg += '<span><i style="border-color:var(--bank);border-top-style:dotted"></i>Class mean ' + cm.m.toFixed(2) + ' (' + cm.n + ' players)</span>';
+    $('cmpLegend').innerHTML = lg;
+    var note = $('cmpNote');
+    if (r.adj === null) {
+      note.textContent = 'You did not bank any balloon, so there is no adjusted-pumps score this time.';
+    } else {
+      var pct = Math.round(phi((r.adj - m) / sd) * 100);
+      pct = Math.max(1, Math.min(99, pct));
+      note.innerHTML = 'You pumped more than about <strong>' + pct + '%</strong> of the teens in the study would be expected to. ' +
+        'In the study, about ' + Math.round(PAPER.popRate * 100) + '% of balloons exploded; yours: ' +
+        (r.balloons ? Math.round(r.popped / r.balloons * 100) : 0) + '%. Balloons in this game burst on a different pattern (see below), so treat this as a rough comparison.';
+    }
+  }
+
+  function drawEV(r) {
+    var svg = $('evChart');
+    var x0 = 30, x1 = 350, base = 126, top = 22, maxV = 1.5;
+    var bw = (x1 - x0) / MAX, best = 1;
+    for (var n = 1; n <= MAX; n++) if (EV[n] > EV[best]) best = n;
+    var h = '';
+    [0, 0.5, 1.0, 1.5].forEach(function (g) {
+      var y = base - g / maxV * (base - top);
+      h += '<line class="axis" x1="' + x0 + '" y1="' + y + '" x2="' + x1 + '" y2="' + y + '" stroke-dasharray="' + (g === 0 ? '' : '2 3') + '"/>';
+      h += '<text x="' + (x0 - 5) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9">' + g.toFixed(1) + '</text>';
+    });
+    for (var i = 1; i <= MAX; i++) {
+      var hh = EV[i] / maxV * (base - top), bx = x0 + (i - 1) * bw + 3;
+      h += '<rect class="bar' + (i === best ? ' best' : '') + '" x="' + bx.toFixed(1) + '" y="' + (base - hh).toFixed(1) + '" width="' + (bw - 6).toFixed(1) + '" height="' + Math.max(0.5, hh).toFixed(1) + '" rx="2"/>';
+      if (EV[i] >= 0.1) h += '<text class="val" x="' + (bx + (bw - 6) / 2).toFixed(1) + '" y="' + (base - hh - 4).toFixed(1) + '" text-anchor="middle" font-size="8.5">' + EV[i].toFixed(2) + '</text>';
+      h += '<text x="' + (bx + (bw - 6) / 2).toFixed(1) + '" y="' + (base + 13) + '" text-anchor="middle" font-size="10">' + i + '</text>';
+      h += '<text x="' + (bx + (bw - 6) / 2).toFixed(1) + '" y="' + (base + 27) + '" text-anchor="middle" font-size="8">' + Math.round(RISK[i] * 100) + '%</text>';
+    }
+    h += '<text x="' + (x0 - 5) + '" y="' + (base + 13) + '" text-anchor="end" font-size="8.5">pumps</text>';
+    h += '<text x="' + (x0 - 5) + '" y="' + (base + 27) + '" text-anchor="end" font-size="8">risk</text>';
+    if (r.adj !== null && r.adj > 0) {
+      var ax = x0 + (Math.min(MAX, r.adj) - 0.5) * bw;
+      h += '<line class="you" x1="' + ax.toFixed(1) + '" y1="' + (top - 8) + '" x2="' + ax.toFixed(1) + '" y2="' + base + '" stroke-dasharray="3 3"/>';
+      h += '<text class="val" x="' + ax.toFixed(1) + '" y="' + (top - 12) + '" text-anchor="' + (ax > 300 ? 'end' : 'middle') + '" font-size="10">your average</text>';
+    }
+    h += '<text x="' + ((x0 + x1) / 2) + '" y="' + (base + 46) + '" text-anchor="middle" font-size="9.5">expected points per balloon, banking after n pumps</text>';
+    svg.innerHTML = h;
+    $('evNote').innerHTML = 'Under each bar is the chance that pump bursts a balloon that is still intact. On average, banking after <strong>' + best + ' pumps</strong> earns the most (' +
+      EV[best].toFixed(2) + ' points per balloon). The teens in the study stopped at 4.70 pumps on average, but their balloons burst on a steeper schedule.';
+  }
+
+  /* ---------- Copy helpers ---------- */
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 2000);
+  }
+  function copyText(text, msg) {
+    var p;
+    try { p = navigator.clipboard.writeText(text); } catch (e) { p = Promise.reject(e); }
+    Promise.resolve(p).then(function () { toast(msg || 'Copied'); }, function () { showCopyFallback(text); });
+  }
+  function showCopyFallback(text) {
+    var a = $('copyArea'); a.value = text;
+    openOverlay('copyOverlay');
+    setTimeout(function () { a.focus(); a.select(); }, 30);
+  }
+  function resultLine() {
+    var r = summarize(G);
+    return 'BART result for ' + G.name + ': ' + f2(r.points) + ' points, adjusted pumps ' + (r.adj === null ? 'n/a' : r.adj.toFixed(2)) +
+      ', banked ' + r.banked + ' and exploded ' + r.popped + ' of ' + r.balloons + ' balloons' +
+      (r.rtI !== null ? ', inflate RT ' + r.rtI + ' ms' : '') + (G.lab ? ' (lab timing)' : ' (quick play)');
+  }
+  function trialsCsv() {
+    var rows = ['player\tballoon\tpumps\toutcome\tpoints_banked\tpoints_lost\ttotal_after\tmean_decision_ms'];
+    G.trials.forEach(function (t) {
+      rows.push([G.name, t.balloon, t.pumps, t.outcome === 'bank' ? 'banked' : 'exploded', f2(t.earned), f2(t.lost), f2(t.total), t.meanRt === null ? '' : Math.round(t.meanRt)].join('\t'));
+    });
+    return rows.join('\n');
+  }
+
+  /* ---------- Class board ---------- */
+  function sortedBoard() {
+    return loadBoard().slice().sort(function (a, b) { return (b.points - a.points) || ((b.adj || 0) - (a.adj || 0)); });
+  }
+  function fmtTime(iso) {
+    try { var d = new Date(iso); return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; }
+  }
+  function pctOf(adj) { return Math.max(1, Math.min(99, Math.round(phi((adj - PAPER.adj.m) / PAPER.adj.sd) * 100))); }
+  function ordinal(n) { var sx = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (sx[(v - 20) % 10] || sx[v] || sx[0]); }
+  function trunc(t, n) { t = String(t); return t.length > n ? t.slice(0, n - 1) + '\u2026' : t; }
+  function hasAdj(r) { return typeof r.adj === 'number'; }
+
+  function renderClassStats(rows) {
+    function tile(k, v, sub) { return '<div class="stat"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>'; }
+    var adjRows = rows.filter(hasAdj);
+    var balloons = 0, popped = 0;
+    rows.forEach(function (r) { balloons += r.balloons || 0; popped += r.popped || 0; });
+    var meanPts = mean(rows.map(function (r) { return r.points; }));
+    var meanAdj = mean(adjRows.map(function (r) { return r.adj; }));
+    var rts = rows.map(function (r) { return r.rtI; }).filter(function (v) { return typeof v === 'number'; });
+    var lo = PAPER.adj.m - PAPER.adj.sd, hi = PAPER.adj.m + PAPER.adj.sd, inside = 0, above = 0, below = 0;
+    adjRows.forEach(function (r) { if (r.adj > hi) above++; else if (r.adj < lo) below++; else inside++; });
+    var h = tile('Players', rows.length, balloons + ' balloons played');
+    h += tile('Mean points', f2(meanPts), 'Top: ' + esc(trunc(rows[0].name, 16)) + ', ' + f2(rows[0].points));
+    h += tile('Mean adjusted pumps', meanAdj === null ? '–' : meanAdj.toFixed(2), 'Study 4.70');
+    h += tile('Balloons exploded', balloons ? Math.round(popped / balloons * 100) + '%' : '–', 'Study ' + Math.round(PAPER.popRate * 100) + '%');
+    h += tile('Inflate decision', rts.length ? Math.round(mean(rts)) + '<small> ms</small>' : '–', 'Study 493 ms');
+    h += tile('In the study\u2019s middle 68%', adjRows.length ? inside + ' of ' + adjRows.length : '–', adjRows.length ? above + ' above, ' + below + ' below' : 'No balloons banked yet');
+    $('clsStats').innerHTML = h;
+  }
+
+  var clsRows = [];
+  function drawClassChart(rows) {
+    clsRows = rows;
+    var svg = $('clsChart');
+    var W = 720, X0 = 372, X1 = 652, PB0 = 168, PBW = 116, RH = 30, top = 40, base = 100, y0 = base + 8;
+    var m = PAPER.adj.m, sd = PAPER.adj.sd;
+    function X(v) { return X0 + (Math.max(1, Math.min(MAX, v)) - 1) / (MAX - 1) * (X1 - X0); }
+    function T(x, y, cls, txt, anchor) { return '<text class="' + cls + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '"' + (anchor ? ' text-anchor="' + anchor + '"' : '') + '>' + txt + '</text>'; }
+    var n = rows.length, yEnd = y0 + n * RH, H = yEnd + 50;
+    var maxPts = Math.max.apply(null, rows.map(function (r) { return r.points; }).concat([0.01]));
+    var adjRows = rows.filter(hasAdj);
+    var cm = adjRows.length >= 2 ? mean(adjRows.map(function (r) { return r.adj; })) : null;
+    var h = '';
+    rows.forEach(function (r, i) {
+      var me = G && G.recordId === r.id;
+      h += '<rect class="rowbg' + (me ? ' me' : '') + '" data-i="' + i + '" x="0" y="' + (y0 + i * RH) + '" width="' + W + '" height="' + RH + '" rx="6"/>';
+      if (i < n - 1) h += '<line class="sep" x1="8" x2="' + (W - 8) + '" y1="' + (y0 + (i + 1) * RH) + '" y2="' + (y0 + (i + 1) * RH) + '"/>';
+    });
+    // study population: middle 68% band through the rows, bell curve above
+    h += '<rect class="band" x="' + X(m - sd).toFixed(1) + '" y="' + base + '" width="' + (X(m + sd) - X(m - sd)).toFixed(1) + '" height="' + (yEnd - base) + '"/>';
+    var peak = 1 / (sd * Math.sqrt(2 * Math.PI)), d = 'M' + X(1).toFixed(1) + ' ' + base;
+    for (var v = 1; v <= MAX + 0.001; v += 0.05) {
+      var yy = Math.exp(-0.5 * Math.pow((v - m) / sd, 2)) / (sd * Math.sqrt(2 * Math.PI));
+      d += ' L' + X(v).toFixed(1) + ' ' + (base - yy / peak * (base - top)).toFixed(1);
+    }
+    d += ' L' + X(MAX).toFixed(1) + ' ' + base + ' Z';
+    h += '<path class="curve" d="' + d + '"/>';
+    h += '<line class="axis" x1="' + X0 + '" x2="' + X1 + '" y1="' + base + '" y2="' + base + '"/>';
+    var sx = X(m);
+    h += '<line class="paper" x1="' + sx.toFixed(1) + '" x2="' + sx.toFixed(1) + '" y1="' + (top - 4) + '" y2="' + yEnd + '"/>';
+    if (cm !== null) {
+      var cx = X(cm);
+      h += '<line class="classm" x1="' + cx.toFixed(1) + '" x2="' + cx.toFixed(1) + '" y1="' + (top - 4) + '" y2="' + yEnd + '"/>';
+      if (Math.abs(cx - sx) < 84) {
+        var right = cx >= sx;
+        h += T(right ? sx - 4 : sx + 4, 31, 'ml s', 'study 4.70', right ? 'end' : 'start');
+        h += T(right ? cx + 4 : cx - 4, 31, 'ml c', 'class ' + cm.toFixed(2), right ? 'start' : 'end');
+      } else {
+        h += T(sx, 31, 'ml s', 'study 4.70', 'middle');
+        h += T(cx, 31, 'ml c', 'class ' + cm.toFixed(2), 'middle');
+      }
+    } else {
+      h += T(sx, 31, 'ml s', 'study 4.70', 'middle');
+    }
+    // column headers
+    h += T(32, 14, 'hd', 'Player') + T(PB0, 14, 'hd', 'Points') + T(X0, 14, 'hd', 'Adjusted pumps vs. the study') + T(W - 6, 14, 'hd', 'Percentile', 'end');
+    rows.forEach(function (r, i) {
+      var cy = y0 + i * RH + RH / 2;
+      h += T(22, cy + 4, 'rk', String(i + 1), 'end');
+      h += T(32, cy + 5, 'nm' + (i === 0 ? ' top' : ''), esc(trunc(r.name, 17)));
+      var w = r.points / maxPts * PBW;
+      if (w > 0) {
+        var rr = Math.min(4, w, 6);
+        h += '<path class="pbar" d="M' + PB0 + ' ' + (cy - 6) + 'h' + (w - rr).toFixed(1) + 'a' + rr + ' ' + rr + ' 0 0 1 ' + rr + ' ' + rr + 'v' + (12 - 2 * rr) + 'a' + rr + ' ' + rr + ' 0 0 1 ' + (-rr) + ' ' + rr + 'h' + (-(w - rr)).toFixed(1) + 'z"/>';
+      }
+      h += T(PB0 + Math.max(0, w) + 6, cy + 4, 'v2', f2(r.points));
+      if (hasAdj(r)) {
+        var ax = X(r.adj), outRight = r.adj >= m && ax < X1 - 30;
+        if (r.adj < m && ax < X0 + 30) outRight = true;
+        h += '<line class="stem" x1="' + sx.toFixed(1) + '" x2="' + ax.toFixed(1) + '" y1="' + cy + '" y2="' + cy + '"/>';
+        h += '<circle class="dot" cx="' + ax.toFixed(1) + '" cy="' + cy + '" r="6"/>';
+        h += T(outRight ? ax + 10 : ax - 10, cy + 4, 'av', r.adj.toFixed(2), outRight ? 'start' : 'end');
+        h += T(W - 6, cy + 5, 'pc', ordinal(pctOf(r.adj)), 'end');
+      } else {
+        h += T(X0, cy + 4, 'av', 'no balloon banked');
+        h += T(W - 6, cy + 5, 'pc', '\u2013', 'end');
+      }
+    });
+    var ay = yEnd + 6;
+    h += '<line class="axis" x1="' + X0 + '" x2="' + X1 + '" y1="' + ay + '" y2="' + ay + '"/>';
+    for (var t = 1; t <= MAX; t++) {
+      h += '<line class="axis" x1="' + X(t).toFixed(1) + '" x2="' + X(t).toFixed(1) + '" y1="' + ay + '" y2="' + (ay + 4) + '"/>';
+      h += T(X(t), ay + 17, 'av', String(t), 'middle');
+    }
+    h += T((X0 + X1) / 2, ay + 34, 'av', 'adjusted pumps (average pumps on banked balloons)', 'middle');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.innerHTML = h;
+    var lg = '<span><i class="dt"></i>Player</span><span><i class="sw"></i>Middle 68% of the study (3.84 to 5.56)</span>' +
+      '<span><i style="border-color:var(--ink);border-top-style:dashed"></i>Study mean 4.70</span>';
+    if (cm !== null) lg += '<span><i style="border-color:var(--bank);border-top-style:dotted"></i>Class mean ' + cm.toFixed(2) + '</span>';
+    $('clsLegend').innerHTML = lg;
+    $('clsNote').textContent = 'Rows are ranked by points. Each dot is a player\u2019s adjusted pumps on the same scale as the study\u2019s 83 teens (mean 4.70, SD 0.86). ' +
+      'Percentile is the share of the study population that pumped less. Balloons in this game burst on a different pattern from the study\u2019s, so treat positions as a rough comparison.';
+  }
+
+  var tipEl = null, tipRow = null;
+  function hideTip() {
+    if (tipRow) { tipRow.classList.remove('on'); tipRow = null; }
+    if (tipEl) tipEl.hidden = true;
+  }
+  function tipMove(e) {
+    var t = e.target, wrapEl = $('clsChartWrap');
+    tipEl = tipEl || $('clsTip');
+    if (!t || !t.classList || !t.classList.contains('rowbg')) { hideTip(); return; }
+    var i = +t.getAttribute('data-i'), r = clsRows[i];
+    if (!r) { hideTip(); return; }
+    if (tipRow !== t) {
+      if (tipRow) tipRow.classList.remove('on');
+      t.classList.add('on'); tipRow = t;
+      var lines = '<b>' + esc(r.name) + '</b><div>Rank ' + (i + 1) + ' of ' + clsRows.length + ', ' + f2(r.points) + ' points</div>';
+      if (hasAdj(r)) {
+        lines += '<div>Adjusted pumps ' + r.adj.toFixed(2) + ' (study 4.70)</div><div>Pumped more than ' + pctOf(r.adj) + '% of the study</div>';
+      } else {
+        lines += '<div>No balloon banked</div>';
+      }
+      lines += '<div>Banked ' + r.banked + ', exploded ' + r.popped + ' of ' + r.balloons + '</div>';
+      if (typeof r.rtI === 'number') lines += '<div>Inflate decision ' + r.rtI + ' ms</div>';
+      tipEl.innerHTML = lines;
+      tipEl.hidden = false;
+    }
+    var wr = wrapEl.getBoundingClientRect();
+    var x = e.clientX - wr.left + wrapEl.scrollLeft + 16, y = e.clientY - wr.top + 16;
+    var tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+    if (x + tw > wrapEl.scrollLeft + wr.width - 4) x = e.clientX - wr.left + wrapEl.scrollLeft - tw - 16;
+    if (y + th > wr.height - 4) y = e.clientY - wr.top - th - 12;
+    tipEl.style.left = Math.max(wrapEl.scrollLeft + 2, x) + 'px';
+    tipEl.style.top = Math.max(2, y) + 'px';
+  }
+
+  function renderBoard() {
+    var rows = sortedBoard();
+    var wrap = $('boardTable'), sum = $('boardSummary');
+    hideTip();
+    $('clsStats').hidden = !rows.length;
+    $('clsChartBlock').hidden = !rows.length;
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="empty">No results yet. Finish a game and it appears here.</div>';
+      sum.textContent = 'Everyone who plays on this computer will be summarised here, ranked by points.';
+      return;
+    }
+    sum.textContent = rows.length + (rows.length === 1 ? ' player has' : ' players have') + ' finished a game on this computer since the results were last cleared.';
+    renderClassStats(rows);
+    drawClassChart(rows);
+    var h = '<table><thead><tr><th class="n">#</th><th>Name</th><th class="n">Points</th><th class="n">Adj. pumps</th><th class="n">Study percentile</th><th class="n">Banked</th><th class="n">Exploded</th><th class="n">Balloons</th><th>Timing</th><th>Played</th></tr></thead><tbody>';
+    rows.forEach(function (r, i) {
+      var me = G && G.recordId === r.id;
+      h += '<tr' + (me ? ' class="me"' : '') + '><td class="n">' + (i + 1) + '</td><td>' + esc(r.name) + '</td><td class="n">' + f2(r.points) + '</td><td class="n">' +
+        (hasAdj(r) ? r.adj.toFixed(2) : '–') + '</td><td class="n">' + (hasAdj(r) ? ordinal(pctOf(r.adj)) : '–') + '</td><td class="n">' + r.banked + '</td><td class="n">' + r.popped + '</td><td class="n">' +
+        r.balloons + (r.planned && r.planned !== r.balloons ? '/' + r.planned : '') + '</td><td>' + esc(r.timing || '') + '</td><td>' + esc(fmtTime(r.at)) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    wrap.innerHTML = h;
+  }
+  function boardTsv() {
+    var rows = ['Rank\tName\tPoints\tAdjusted pumps\tStudy percentile\tBanked\tExploded\tBalloons\tTiming\tInflate RT (ms)\tBank RT (ms)\tPlayed'];
+    sortedBoard().forEach(function (r, i) {
+      rows.push([i + 1, r.name, f2(r.points), hasAdj(r) ? r.adj.toFixed(2) : '', hasAdj(r) ? pctOf(r.adj) : '', r.banked, r.popped, r.balloons, r.timing || '', r.rtI == null ? '' : r.rtI, r.rtB == null ? '' : r.rtB, r.at || ''].join('\t'));
+    });
+    return rows.join('\n');
+  }
+  function updateMiniBoard() {
+    var rows = sortedBoard();
+    $('miniBoardText').textContent = rows.length
+      ? 'Class results: ' + rows.length + (rows.length === 1 ? ' player' : ' players') + ', leader ' + rows[0].name + ' (' + f2(rows[0].points) + ')'
+      : 'No results on this computer yet.';
+  }
+
+  /* ---------- Overlays ---------- */
+  var openOv = null, lastFocus = null;
+  function openOverlay(id) {
+    lastFocus = document.activeElement;
+    if (openOv) $(openOv).hidden = true;
+    openOv = id; $(id).hidden = false;
+    var b = $(id).querySelector('button'); if (b) b.focus();
+  }
+  function closeOverlay() {
+    if (!openOv) return;
+    $(openOv).hidden = true; openOv = null;
+    hideTip();
+    $('boardClearConfirm').hidden = true; $('boardClear').hidden = false;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  function openBoard(e) { if (e) e.preventDefault(); renderBoard(); openOverlay('boardOverlay'); }
+
+  /* ---------- Wiring ---------- */
+  $('setupForm').addEventListener('submit', startGame);
+  inflateBtn.addEventListener('click', doInflate);
+  bankBtn.addEventListener('click', doBank);
+  $('quitBtn').addEventListener('click', function () { $('quitRow').hidden = true; $('quitConfirm').hidden = false; $('quitNo').focus(); });
+  $('quitNo').addEventListener('click', function () { $('quitRow').hidden = false; $('quitConfirm').hidden = true; });
+  $('quitYes').addEventListener('click', quitGame);
+  $('againBtn').addEventListener('click', function () {
+    phase = 'setup'; showView('setup'); updateChips();
+    setNum(totalVal, 0); setNum(wagerVal, 0);
+    controlsNote.textContent = 'Set up a player on the right, then press Start game.';
+    resetBalloon(0.001); setTarget(scaleFor(2), 400);
+    var nm = $('playerName'); nm.value = ''; nm.focus();
+  });
+  $('copyResultBtn').addEventListener('click', function () { copyText(resultLine(), 'Result copied'); });
+  $('copyTrialsBtn').addEventListener('click', function () { copyText(trialsCsv(), 'Balloon data copied'); });
+  $('boardBtn').addEventListener('click', openBoard);
+  $('miniBoardBtn').addEventListener('click', openBoard);
+  $('classResultsBtn').addEventListener('click', openBoard);
+  $('clsChart').addEventListener('pointermove', tipMove);
+  $('clsChart').addEventListener('pointerdown', tipMove);
+  $('clsChart').addEventListener('pointerleave', hideTip);
+  $('boardClose').addEventListener('click', closeOverlay);
+  $('copyClose').addEventListener('click', closeOverlay);
+  $('boardCopy').addEventListener('click', function () {
+    if (!loadBoard().length) { toast('The board is empty'); return; }
+    copyText(boardTsv(), 'Table copied. Paste it into a spreadsheet.');
+  });
+  $('boardClear').addEventListener('click', function () { $('boardClear').hidden = true; $('boardClearConfirm').hidden = false; $('boardClearNo').focus(); });
+  $('boardClearNo').addEventListener('click', function () { $('boardClear').hidden = false; $('boardClearConfirm').hidden = true; });
+  $('boardClearYes').addEventListener('click', function () {
+    saveBoard([]); renderBoard(); updateMiniBoard();
+    $('boardClear').hidden = false; $('boardClearConfirm').hidden = true; toast('Board cleared');
+  });
+  ['boardOverlay', 'copyOverlay'].forEach(function (id) {
+    $(id).addEventListener('click', function (e) { if (e.target === $(id)) closeOverlay(); });
+  });
+
+  function renderSound() {
+    $('soundLabel').textContent = soundOn ? 'Sound on' : 'Sound off';
+    $('soundBtn').setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    $('soundWaves').style.opacity = soundOn ? '1' : '0.15';
+  }
+  renderSound();
+  $('soundBtn').addEventListener('click', function (e) {
+    soundOn = !soundOn; pref('bart-sound', soundOn ? 'on' : 'off'); renderSound();
+    if (soundOn) { audioInit(); sBank(); }
+    if (e.detail > 0) this.blur();
+  });
+  var fsBtn = $('fsBtn');
+  var fsOk = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  if (!fsOk) fsBtn.hidden = true;
+  fsBtn.addEventListener('click', function (e) {
+    var de = document.documentElement;
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        var r = (de.requestFullscreen || de.webkitRequestFullscreen).call(de);
+        if (r && r.catch) r.catch(function () { toast('Full screen is not available here'); });
+      }
+    } catch (err) { toast('Full screen is not available here'); }
+    if (e.detail > 0) this.blur();
+  });
+  $('boardBtn').addEventListener('mouseup', function () { this.blur(); });
+
+  // Keyboard: Space / ↑ = Inflate, Enter / B = Bank (only while a game is running)
+  function gameKey(e) {
+    if (phase !== 'play' || openOv) return null;
+    var t = e.target;
+    if (t && t.closest && t.closest('input, textarea, select, .panel button, .bar button')) return null;
+    var k = e.key;
+    if (k === ' ' || k === 'Spacebar' || k === 'ArrowUp' || k === 'i' || k === 'I') return 'inflate';
+    if (k === 'Enter' || k === 'b' || k === 'B') return 'bank';
+    return null;
+  }
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && openOv) { closeOverlay(); return; }
+    var a = gameKey(e);
+    if (!a) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (a === 'inflate') doInflate(); else doBank();
+  }, true);
+  window.addEventListener('keyup', function (e) { if (gameKey(e)) e.preventDefault(); }, true);
+
+  updateMiniBoard();
+  updateChips();
+})();
+</script>
+
+</body>
+</html>
